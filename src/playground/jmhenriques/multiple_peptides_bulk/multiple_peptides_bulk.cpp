@@ -9,7 +9,7 @@
  *         while the other handles inter-protein interactions.
  *
  * @author Joao Henriques
- * @date   2014/12/05 
+ * @date   2015/06/12 
  */
 //
 using namespace Faunus;
@@ -100,12 +100,10 @@ int main() {
   //
   Analysis::PolymerShape shape;
   Average<double> rg2;
-  Average<double> rg2all;
-  Analysis::RadialDistribution<> rdf(0.2);
+  Average<double> re;
+  //
+  Analysis::LineDistribution<> p2p_dist(0.2);
   Analysis::ChargeMultipole mp;
-  Analysis::LineDistribution<> rg2dist(0.2);
-  Analysis::LineDistribution<> allrg2dist(0.2);
-  // Scatter::DebyeFormula<Scatter::FormFactorUnity<> > debye(mcp); // do later
   //
   spc.load("simulation.state");
   //
@@ -115,13 +113,17 @@ int main() {
   EnergyDrift sys;
   sys.init(Energy::systemEnergy(spc, pot, spc.p));
   //
-  std::ofstream rgstep("rg_step.dat");
-  std::ofstream allrgstep("all_rg_step.dat");
+  std::ofstream rg_step("rg_step.dat");
+  std::ofstream re_step("re_step.dat");
   //
   cout << atom.info()
        << spc.info() 
        << pot.info() 
-       << textio::header("- - - - -   D O   I T   F O R   T E H   L U L Z   - - - - -");
+       << "\n  ------------------------------------------------------------------------------------\n"
+       << "  Louis: Hey, keep your f*cking mouth shut, all right? I mean it not one f*cking word!\n"
+       << "  Melanie: Okay, Louis...\n"                                       
+       << "  [Louis pulls a gun and shoots Melanie twice]\n"
+       << "  ------------------------------------------------------------------------------------\n\n";
   //
   MCLoop loop(mcp);
   while (loop[0]) {
@@ -133,21 +135,6 @@ int main() {
 	{
       	mv.setGroup(peptides);
 	sys += mv.move(peptides.size());
-	// (Aggregate) Rg distribution.
-	peptides.setMassCenter(spc);
-	Point pt = shape.vectorgyrationRadiusSquared(peptides, spc);
-	double val = pt.x() + pt.y() + pt.z();
-	rg2all.add(val);
-	allrg2dist(val)++;
-        // Sample shape.
-	for (auto &element : pepvec) {
-	  element.setMassCenter(spc);
-	  shape.sample(element, spc);
-	  Point pt = shape.vectorgyrationRadiusSquared(element, spc);
-	  double val = pt.x() + pt.y() + pt.z();
-	  rg2.add(val);
-	  rg2dist(val)++;
-	}
 	break;
 	}
       // Group translation/rotation.
@@ -188,25 +175,34 @@ int main() {
 	mp.sample(pepvec, spc);
 	break;
       }
-      // Peptide-peptide mass center RDF.
+      // (Average) individual shape and Rg/Ree vs. step.
+      for (auto &element : pepvec) {
+	element.setMassCenter(spc);
+	shape.sample(element, spc);
+	Point pt = shape.vectorgyrationRadiusSquared(element, spc);
+	double val = pt.x() + pt.y() + pt.z();
+	rg2.add(val);
+	auto i = element.front();
+	auto j = element.back();
+	double dist = spc.geo.dist(spc.p[i], spc.p[j]);	
+	re.add(dist);
+      }
+      // Peptide-peptide center of mass distance distribution.
       for (auto i = pepvec.begin(); i != pepvec.end()-1; i++)
-	for (auto j = i+1; j != pepvec.end(); j++)
-	  rdf( spc.geo.dist(i->cm, j->cm) )++;
+	for (auto j = i+1; j != pepvec.end(); j++) {
+	  double dist = spc.geo.dist(i->cm, j->cm);
+	  p2p_dist(dist)++;	    
+	}
       // End of loop[1].  
     }
-    // Sample Scattering.
-    // debye.sample(spc.p); // do later
-    rgstep << loop.innerCount() << " " << sqrt(rg2.avg()) << "\n";
-    allrgstep << loop.innerCount() << " " << sqrt(rg2all.avg()) << "\n";
+    rg_step << loop.innerCount() << " " << sqrt(rg2.avg()) << endl;
+    re_step << loop.innerCount() << " " << re.avg() << endl;
     sys.checkDrift(Energy::systemEnergy(spc, pot, spc.p));
     cout << loop.timing();
     gro.save("simulation.gro", spc.p, "append");
     // End of loop[0].
-  } 
-  rdf.save("rdf_p2p.dat");
-  rg2dist.save("rg_dist.dat");
-  allrg2dist.save("all_rg_dist.dat");
-  // debye.save("debye.dat"); // do later
+  }
+  p2p_dist.save("p2p_dist.dat");
   spc.save("simulation.state");  
   FormatPQR::save("simulation.pqr", spc.p);
   //
@@ -218,6 +214,6 @@ int main() {
        << rep.info()
        << tit.info()
        << mp.info()
-       << shape.info() 
+       << shape.info()
        << loop.info();
 }
