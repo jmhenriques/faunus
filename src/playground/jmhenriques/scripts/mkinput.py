@@ -12,7 +12,7 @@ Except the pKa for O-phospho-L-serine (pSE), taken from Zachariou_1996_JPC_100_1
 #
 __author__  = "Joao Henriques"
 __email__   = "joao.henriques@teokem.lu.se"
-__date__    = "2014.02.24"
+__date__    = "2015.06.23"
 __status__  = "Production"
 #
 """
@@ -55,8 +55,8 @@ dict={'ALA' :[ 0, 71 , "True" ],
       'HNTR':[ 1, 14 , "False"]}
 #
 def Usage():
-    print "\nTo produce a JSON file: \n\t%s json <protein density, g/L> <pH value>" %(sys.argv[0])
-    print "\nTo produce a AAM file : \n\t%s aam <input file, fasta format> <protein density, g/L>\n" %(sys.argv[0])
+    print "\nTo produce a JSON file: \n\t%s json <protein density, g/cm^3> <pH value>" %(sys.argv[0])
+    print "\nTo produce a AAM file : \n\t%s aam <input file, fasta format> <protein density, g/cm^3>\n" %(sys.argv[0])
 #
 def readFasta(file):
     """
@@ -99,7 +99,14 @@ def readFasta(file):
     return list
 #
 def getRadius(mass, density):
-    r=math.pow((3.0/(4.0*math.pi))*(float(mass)/float(density)), 1.0/3.0)
+    """
+    This function is now correct. The bug was severe but luckily
+    it led to negligible error.
+    """
+    NA = 6.0221413e+23                      # mol^-1
+    molarVol = float(mass)/float(density)   # cm^3/mol
+    volume = (molarVol*math.pow(1e8, 3))/NA # Angstrom^3
+    r = math.pow(((3.0*volume)/(4.0*math.pi)), 1.0/3.0)
     return r
 #
 def writeJSON(dict, density, pH):
