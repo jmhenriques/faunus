@@ -12,7 +12,7 @@ Except the pKa for O-phospho-L-serine (pSE), taken from Zachariou_1996_JPC_100_1
 #
 __author__  = "Joao Henriques"
 __email__   = "joao.henriques@teokem.lu.se"
-__date__    = "2015.06.23"
+__date__    = "2015.06.25"
 __status__  = "Production"
 #
 """
@@ -55,15 +55,15 @@ dict={'ALA' :[ 0, 71 , "True" ],
       'HNTR':[ 1, 14 , "False"]}
 #
 def Usage():
-    print "\nTo produce a JSON file: \n\t%s json <protein density, g/cm^3> <pH value>" %(sys.argv[0])
-    print "\nTo produce a AAM file : \n\t%s aam <input file, fasta format> <protein density, g/cm^3>\n" %(sys.argv[0])
+    print "\nTo produce a JSON file: \n\t%s json <input fasta file> <pH>" %(sys.argv[0])
+    print "\nTo produce a AAM file : \n\t%s aam  <input fasta file> <bond length (Angstrom)>\n" %(sys.argv[0])
 #
 def readFasta(file):
     """
     Reads a FASTA sequence and returns a list with the corresponding 
     three-letter code.
-    Appends NTR and CTR to both ends. X doesn't exist, but I added it 
-    for pSE.
+    Appends NTR and CTR to both ends. X and Z don't exist, but I added 
+    them for pSE and nSE.
     """
     list = ['NTR']
     dict = {'A' : 'ALA',
@@ -98,10 +98,23 @@ def readFasta(file):
     list.append('CTR')
     return list
 #
+def getDensity(fasta):
+    """
+    Calculates the protein density using an equation 
+    taken from Fischer_2004_ProteinScience_13_2825.
+    """
+    mass = float(0)
+    for res in fasta:
+        if res in dict:
+            mass += dict[res][1]/1000.0           # kDa
+    density = 1.41 + 0.145 * math.exp(-mass/13.0) # g/cm^3
+    return density
+#
 def getRadius(mass, density):
     """
-    This function is now correct. The bug was severe but luckily
-    it led to negligible error.
+    Computes the radius of an aa residue with a given (molecular) volume,
+    assuming a spherical approximation. The (molecular) volume is obtained 
+    from the residue mass and protein density.
     """
     NA = 6.0221413e+23                      # mol^-1
     molarVol = float(mass)/float(density)   # cm^3/mol
@@ -109,43 +122,53 @@ def getRadius(mass, density):
     r = math.pow(((3.0*volume)/(4.0*math.pi)), 1.0/3.0)
     return r
 #
-def writeJSON(dict, density, pH):
+def writeJSON(pH, density):
     """
     Simplest way of writing a fully automatic JSON file.
     """
-    vals1={}
-    vals2={}
+    vals1 = {}
+    vals2 = {}
     for key in dict:
-        val=dict[key]
+        val = dict[key]
         if len(key)<4 and len(val)==4:
             vals1.update({"H-"+key:{"bound":"H"+key, "free":key, "pKd":val[3], "pX":round(float(pH), 1)}})
         vals2.update({key:{"q":val[0], "mw":round(val[1], 1), "r":round(getRadius(val[1], density), 1), "hydrophobic":ast.literal_eval(val[2])}})
-    data={"processes":vals1, "atomlist":vals2}
+    data = {"processes":vals1, "atomlist":vals2}
     print json.dumps(data, indent=4, sort_keys=True)
 #            
-def writeAAM(list, dict, density):
+def writeAAM(fasta, density, bondlen):
     """
     Writes an AAM file given a three letter a.a. sequence.
     I need to write a FASTA reader for Faunus, because this is a dumb
     way of dealing with this.
     """
-    print len(list)
+    print len(fasta)
     c=1
     i=0.0
-    for aa in list:
-        if dict.has_key(aa):
+    for res in fasta:
+        if res in dict:
             # AAM key: 
             # resn x y z charge mass radius
-            print "%s\t%3i %6.1f 0.0 0.0 %2i %5.1f %5.1f" %(aa, c, i, dict[aa][0], dict[aa][1], getRadius(dict[aa][1], density))
-        c+=1
-        i+=4.9
+            print "%s\t%3i %6.1f 0.0 0.0 %2i %5.1f %5.1f" %(res, c, i, dict[res][0], dict[res][1], getRadius(dict[res][1], density))
+        c += 1
+        i += float(bondlen)
 #
 if __name__=="__main__":
     if len(sys.argv[:]) > 1:
-        if sys.argv[1].lower()=='json':
-            writeJSON(dict, sys.argv[2], sys.argv[3])
+        if sys.argv[1].lower() in ("h", "-h", "--h", "help", "-help", "--help"):
+            Usage()
+        elif sys.argv[1].lower()=='json':
+            fname = sys.argv[2]
+            fasta = readFasta(fname)
+            density = getDensity(fasta)
+            pH = sys.argv[3]
+            writeJSON(pH, density)
         elif sys.argv[1].lower()=="aam":
-            writeAAM(readFasta(sys.argv[2]), dict, sys.argv[3])
+            fname = sys.argv[2]
+            fasta = readFasta(fname)
+            density = getDensity(fasta)
+            bondlen = sys.argv[3]
+            writeAAM(fasta, density, bondlen)
         else:
             Usage()
     else:
