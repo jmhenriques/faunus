@@ -106,9 +106,9 @@ int main() {
   std::map<int, Analysis::LineDistribution<> > surfresdist;
   Table2D<double, Average<double> > netqtable;
   Table2D<double, Average<double> > rg2table;
-  Table2D<double, Average<double> > rgx2table; // NEW & lazy
-  Table2D<double, Average<double> > rgy2table; // NEW & lazy
-  Table2D<double, Average<double> > rgz2table; // NEW & lazy
+  Table2D<double, Average<double> > rgx2table; // NEW
+  Table2D<double, Average<double> > rgy2table; // NEW
+  Table2D<double, Average<double> > rgz2table; // NEW
 #endif
   //
   spc.load("simulation.state");
@@ -169,7 +169,7 @@ int main() {
         Point mc = Geometry::massCenter(spc.geo, spc.p, pol);                // mass center coord
         double dist = pot.first.first.first.first.second.expot.surfDist(mc); // mc dist to surf
         surfmcdist(dist)++;                                                  // mass center prob distr along the z axis
-        netqtable(dist) += ::netCharge(spc.p, pol);                          // NEW
+        netqtable(dist) += ::netCharge(spc.p, pol);                          // net q vs. dist to surf
         Point rg2 = shape.vectorgyrationRadiusSquared(pol, spc);             // Rg2 coord
         rg2table(dist)  += rg2.x() + rg2.y() + rg2.z();                      // Rg2 vs. dist to surf
 	rgx2table(dist) += rg2.x();                                          // NEW
@@ -195,13 +195,13 @@ int main() {
 #ifdef SURFACE  
     netqtable.save("netq_dist.dat");
     rg2table.save("rg2_dist.dat");
-    rgx2table.save("rgx2_dist.dat");
-    rgy2table.save("rgy2_dist.dat");
-    rgz2table.save("rgz2_dist.dat");
+    rgx2table.save("rgx2_dist.dat"); // NEW
+    rgy2table.save("rgy2_dist.dat"); // NEW
+    rgz2table.save("rgz2_dist.dat"); // NEW
 #endif
     //
     gro.save("simulation.gro", spc.p, "append");
-    spc.save("simulation.state"); // NEW
+    spc.save("simulation.state");
   //
   } // End of macro loop
   //
